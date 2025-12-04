@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>ESP32 BLE Controller</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+  <h1>ESP32 BLE Controller</h1>
+
+  <section id="connection">
+    <button id="connectBtn">ESP32に接続</button>
+    <span id="status">未接続</span>
+  </section>
+
+  <section id="control" class="hidden">
+    <h2>コントロール</h2>
+
+    <label for="valueSlider">
+      値: <span id="valueLabel">0</span>
+    </label>
+    <input id="valueSlider" type="range" min="0" max="100" step="1" value="0" />
+
+    <button id="sendBtn">値を送信</button>
+  </section>
+
+  <section id="logSection">
+    <h2>ログ</h2>
+    <pre id="log"></pre>
+  </section>
+
+  <script src="js/main.js"></script>
+</body>
+
+</html>
