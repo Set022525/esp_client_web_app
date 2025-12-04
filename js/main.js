@@ -1,19 +1,25 @@
 // ======== ここを自分のESP32の設定に合わせて書き換え ==========
 const SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
 const CHARACTERISTIC_UUID = "12345678-1234-5678-1234-56789abcdef1";
+const POSITION_CHARACTERISTIC_UUID = "12345678-1234-5678-1234-56789abcdef2";
 const DEVICE_NAME_PREFIX = "ESP32-L6471"; // ESP32側のデバイス名と合わせる
+const MICROSTEPS_PER_REV = 1600; // 200step/rev * 1/8 microstep
 // ==============================================================
 
 let bleDevice = null;
 let bleServer = null;
 let cmdCharacteristic = null;
+let posCharacteristic = null;
 
 const connectBtn = document.getElementById("connectBtn");
 const statusEl = document.getElementById("status");
 const controlSection = document.getElementById("control");
 const valueSlider = document.getElementById("valueSlider");
 const valueLabel = document.getElementById("valueLabel");
-const sendBtn = document.getElementById("sendBtn");
+const btnUp = document.getElementById("btnUp");
+const btnDown = document.getElementById("btnDown");
+const stepCountEl = document.getElementById("stepCount");
+const revCountEl = document.getElementById("revCount");
 const logEl = document.getElementById("log");
 
 function log(msg) {
@@ -24,6 +30,32 @@ function log(msg) {
 
 function setStatus(text) {
   statusEl.textContent = text;
+}
+
+function isConnected() {
+  return cmdCharacteristic && bleDevice && bleDevice.gatt.connected;
+}
+
+async function sendValue(rawValue) {
+  if (!cmdCharacteristic) {
+    alert("まだ接続されていません。");
+    return;
+  }
+  const value = Math.max(0, Math.min(255, rawValue));
+  try {
+    await cmdCharacteristic.writeValue(new Uint8Array([value]));
+    log(`送信値: ${value}`);
+  } catch (error) {
+    console.error(error);
+    log("送信エラー: " + error);
+  }
+}
+
+function encodeCommand(direction) {
+  const speed = parseInt(valueSlider.value, 10);
+  // 0は停止。1-100 正転、0x80 | speed で逆転を表現。
+  if (speed === 0) return 0;
+  return direction === "ccw" ? (0x80 | speed) : speed;
 }
 
 valueSlider.addEventListener("input", () => {
@@ -59,6 +91,10 @@ connectBtn.addEventListener("click", async () => {
 
     cmdCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
     log("キャラクタリスティック取得");
+    posCharacteristic = await service.getCharacteristic(POSITION_CHARACTERISTIC_UUID);
+    log("位置キャラクタリスティック取得");
+
+    await subscribePosition();
 
     setStatus(`接続中: ${device.name}`);
     controlSection.classList.remove("hidden");
@@ -74,25 +110,50 @@ function onDisconnected(event) {
   log(`切断: ${device.name}`);
   setStatus("切断済み");
   controlSection.classList.add("hidden");
+  posCharacteristic = null;
 }
 
-sendBtn.addEventListener("click", async () => {
-  if (!cmdCharacteristic) {
-    alert("まだ接続されていません。");
-    return;
-  }
+function attachHoldButton(btn, direction) {
+  let holding = false;
 
-  const value = parseInt(valueSlider.value, 10);
-  log(`送信値: ${value}`);
+  const start = async () => {
+    if (!isConnected()) return;
+    holding = true;
+    await sendValue(encodeCommand(direction));
+  };
 
-  try {
-    // ここでは「0〜100の整数値を1バイトで送る」例
-    // ESP32側も同じフォーマットで読み取る必要があります。
-    const data = new Uint8Array([value]);
-    await cmdCharacteristic.writeValue(data);
-    log("送信完了");
-  } catch (error) {
-    console.error(error);
-    log("送信エラー: " + error);
-  }
-});
+  const stop = async () => {
+    if (!holding || !isConnected()) return;
+    holding = false;
+    await sendValue(0); // ソフトストップ
+  };
+
+  btn.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    start();
+  });
+  btn.addEventListener("pointerup", stop);
+  btn.addEventListener("pointerleave", stop);
+  btn.addEventListener("pointercancel", stop);
+}
+
+attachHoldButton(btnUp, "cw");
+attachHoldButton(btnDown, "ccw");
+
+async function subscribePosition() {
+  if (!posCharacteristic) return;
+  posCharacteristic.addEventListener("characteristicvaluechanged", (event) => {
+    const dv = event.target.value;
+    if (!dv || dv.byteLength < 4) return;
+    const steps = dv.getInt32(0, true); // little-endian
+    stepCountEl.textContent = steps.toString();
+    const rev = steps / MICROSTEPS_PER_REV;
+    revCountEl.textContent = rev.toFixed(3);
+  });
+  await posCharacteristic.startNotifications();
+  // 初期値を一度読んで表示
+  const v = await posCharacteristic.readValue();
+  const steps = v.getInt32(0, true);
+  stepCountEl.textContent = steps.toString();
+  revCountEl.textContent = (steps / MICROSTEPS_PER_REV).toFixed(3);
+}

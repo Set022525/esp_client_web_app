@@ -24,7 +24,16 @@
     </label>
     <input id="valueSlider" type="range" min="0" max="100" step="1" value="0" />
 
-    <button id="sendBtn">値を送信</button>
+    <div id="directionButtons">
+      <button id="btnUp" class="dir-btn">🔼 正転</button>
+      <button id="btnDown" class="dir-btn">🔽 逆転</button>
+    </div>
+    <p class="hint">ボタンを押している間だけ回転します。速度はスライダで調整。</p>
+
+    <div id="positionPanel">
+      <p>積算ステップ: <span id="stepCount">--</span></p>
+      <p>推定回転数 (1/8 μステップ, 200step/rev): <span id="revCount">--</span></p>
+    </div>
   </section>
 
   <section id="logSection">
