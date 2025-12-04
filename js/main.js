@@ -1,7 +1,7 @@
 // ======== ここを自分のESP32の設定に合わせて書き換え ==========
 const SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0";
 const CHARACTERISTIC_UUID = "12345678-1234-5678-1234-56789abcdef1";
-const DEVICE_NAME_PREFIX = "ESP32"; // デバイス名の先頭一致でフィルタ
+const DEVICE_NAME_PREFIX = "ESP32-L6471"; // ESP32側のデバイス名と合わせる
 // ==============================================================
 
 let bleDevice = null;
