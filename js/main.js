@@ -99,6 +99,13 @@ connectBtn.addEventListener("click", async () => {
     setStatus(`接続中: ${device.name}`);
     controlSection.classList.remove("hidden");
   } catch (error) {
+    // NotFoundError はユーザーがデバイス選択をキャンセルした場合にも発生する
+    if (error && error.name === "NotFoundError") {
+      log("接続キャンセル: デバイスが選択されませんでした。");
+      setStatus("キャンセルされました");
+      return;
+    }
+
     console.error(error);
     log("接続エラー: " + error);
     setStatus("接続エラー");
