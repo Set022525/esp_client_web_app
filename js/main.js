@@ -72,8 +72,12 @@ connectBtn.addEventListener("click", async () => {
     log("デバイス検索中...");
     setStatus("検索中...");
 
+    // 名前が違う場合でもサービス UUID で拾えるようにフィルタを複数指定
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: DEVICE_NAME_PREFIX }],
+      filters: [
+        { namePrefix: DEVICE_NAME_PREFIX },
+        { services: [SERVICE_UUID] },
+      ],
       optionalServices: [SERVICE_UUID],
     });
 
