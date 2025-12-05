@@ -84,13 +84,31 @@ connectBtn.addEventListener("click", async () => {
     bleDevice = device;
     bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
 
-    log(`デバイス選択: ${device.name}`);
+    const deviceLabel = device.name || "不明なデバイス";
+    log(`デバイス選択: ${deviceLabel}`);
     setStatus(`接続中...`);
 
-    bleServer = await device.gatt.connect();
+    const ensureConnected = async () => {
+      if (device.gatt.connected) return device.gatt;
+      return await device.gatt.connect();
+    };
+
+    bleServer = await ensureConnected();
     log("GATT 接続完了");
 
-    const service = await bleServer.getPrimaryService(SERVICE_UUID);
+    let service;
+    try {
+      service = await bleServer.getPrimaryService(SERVICE_UUID);
+    } catch (error) {
+      // 接続直後に切断された場合は1回だけ再接続して再試行
+      if (error.name === "NetworkError" && !device.gatt.connected) {
+        log("切断を検知したので再接続を試行します...");
+        bleServer = await ensureConnected();
+        service = await bleServer.getPrimaryService(SERVICE_UUID);
+      } else {
+        throw error;
+      }
+    }
     log("サービス取得");
 
     cmdCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
