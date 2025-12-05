@@ -81,6 +81,15 @@ connectBtn.addEventListener("click", async () => {
       optionalServices: [SERVICE_UUID],
     });
 
+    // 既存の接続が残っている場合は切断
+    if (bleDevice && bleDevice.gatt.connected) {
+      try {
+        bleDevice.gatt.disconnect();
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
     bleDevice = device;
     bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
 
@@ -88,27 +97,30 @@ connectBtn.addEventListener("click", async () => {
     log(`デバイス選択: ${deviceLabel}`);
     setStatus(`接続中...`);
 
-    const ensureConnected = async () => {
-      if (device.gatt.connected) return device.gatt;
-      return await device.gatt.connect();
-    };
+    const connectAndGetService = async (attempt = 1, maxAttempt = 3) => {
+      const start = performance.now();
+      const ensureConnected = async () => {
+        if (device.gatt.connected) return device.gatt;
+        return await device.gatt.connect();
+      };
 
-    bleServer = await ensureConnected();
-    log("GATT 接続完了");
+      bleServer = await ensureConnected();
+      log(`GATT 接続完了 (try ${attempt}, ${(performance.now() - start).toFixed(0)}ms)`);
 
-    let service;
-    try {
-      service = await bleServer.getPrimaryService(SERVICE_UUID);
-    } catch (error) {
-      // 接続直後に切断された場合は1回だけ再接続して再試行
-      if (error.name === "NetworkError" && !device.gatt.connected) {
-        log("切断を検知したので再接続を試行します...");
-        bleServer = await ensureConnected();
-        service = await bleServer.getPrimaryService(SERVICE_UUID);
-      } else {
+      try {
+        const s = await bleServer.getPrimaryService(SERVICE_UUID);
+        return s;
+      } catch (error) {
+        if (error.name === "NetworkError" && attempt < maxAttempt) {
+          log(`切断を検知 (try ${attempt}) -> 再接続を試行します...`);
+          await new Promise((r) => setTimeout(r, 150));
+          return await connectAndGetService(attempt + 1, maxAttempt);
+        }
         throw error;
       }
-    }
+    };
+
+    const service = await connectAndGetService();
     log("サービス取得");
 
     cmdCharacteristic = await service.getCharacteristic(CHARACTERISTIC_UUID);
