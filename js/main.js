@@ -174,7 +174,7 @@ function attachHoldButton(btn, direction) {
     start();
   });
   btn.addEventListener("pointerup", stop);
-  btn.addEventListener("pointerleave", stop);
+  // btn.addEventListener("pointerleave", stop);
   btn.addEventListener("pointercancel", stop);
 }
 
